@@ -1,7 +1,7 @@
 # Roadmap.sh-SSH-Remote-Server-Setup
-https://roadmap.sh/projects/ssh-remote-server-setup
+<https://roadmap.sh/projects/ssh-remote-server-setup>
 
-## Etapes pour configurer la connexion ssh avec clé privée
+# Etapes pour configurer la connexion ssh avec clé privée
 
 > #### NB : Pour ce TP nous utiliserons
 >
@@ -9,7 +9,6 @@ https://roadmap.sh/projects/ssh-remote-server-setup
 > - Windows 11 comme hôte (Celle qui se connectera par ssh au serveur)
 >
 > La machine serveur est une machine virtuelle créé en local sous VistualBox
-
 
 Pour cela nous allons suivre minitieusement ces étapes.
 
@@ -117,3 +116,93 @@ $ ssh -i C:\Users\jb.onomo\.ssh\devops_vm_key -p 2222 username@192.168.X.X
 > - **-i C:\Users\jb.onomo\.ssh\devops_vm_key** représente le chemin vers le fichier contenant la clé privée
 > - **-p 2222** représente le port de connxion ssh
 > - **username@192.168.X.X** représente la combinaison username et IP Address
+
+<br>
+
+##
+<br>
+
+# En bonus on installe le banisseur des attaques Brute force
+
+### 1. Installation des packages correspondants
+````
+$ sudo apt update && sudo apt install fail2ban -y
+````
+
+### 2. Création d'une configuration locale
+````
+$ sudo nano /etc/fail2ban/jail.local
+````
+
+Ensuite on colle le contenu ci dessous à l'intérieur du fichier
+````
+[DEFAULT]
+bantime = 1h
+findtime = 10m
+maxretry = 3
+banaction = iptables-multiport
+
+[sshd]
+enabled = true
+port = 2222
+filter = sshd-aggressive
+logpath = /var/log/auth.log
+maxretry = 3
+````
+
+> Où :
+>
+> Section [DEFAULT]
+> - **bantime = 1h** représente le durée pendant laquelle une IP sera banie après avoir dépassé le nombre maximal de tentatives.
+> - **findtime = 10m** indique la fenêtre de temps durant laquelle fail2ban compte les tentatives échouées. Si le nombre de tentatives dépasse maxretry dans ces 10 minutes, l'IP est bannie.
+> - **maxretry = 3** Nombre maximum de tentatives échouées autorisées pendant la période findtime avant de bannir l'IP.
+> - **banaction = iptables-multiport**  représente l'action utilisée pour bannir l'IP. Ici, fail2ban utilisera iptables pour bloquer l'IP sur plusieurs ports simultanément.
+>
+> Section [sshd]
+> - **enabled = true** represente le statut de la surveillance SSH
+> - **port = 2222** représente le port SSH surveillé.
+> - **filter = sshd-aggressive** représente le fichier de filtre utilisé pour détecter les tentatives suspectes dans les logs. Le filtre "sshd-aggressive" est plus strict que le filtre standard "sshd" et bannit plus rapidement.
+> - **logpath = /var/log/auth.log** représente le fichier de log surveillé pour détecter les tentatives de connexion SSH échouées.
+> - **maxretry = 3** représente la surcharge le paramètre par défaut pour cette jail spécifique.
+
+### 3. Activation du service au démarrage et redémarrage
+````
+$ sudo systemctl enable fail2ban
+$ sudo systemctl start fail2ban
+````
+
+### 4. On vérifie le status
+````
+$ sudo fail2ban-client status sshd
+````
+
+A ce stade, le service devrait être démarré et vous pouvez tester.<br>
+Si tout est bien installé la commande ci dessus devrait vous retourner ceci
+
+````
+Status for the jail: sshd
+|- Filter
+|  |- Currently failed: 0
+|  |- Total failed: 0
+|  `- File list: /var/log/auth.log
+`- Actions
+   |- Currently banned: 0
+   |- Total banned: 0
+   `- Banned IP list:
+````
+
+### 5. Quelques commandes utiles
+> #### 5.1 Débannir une IP
+> ````
+> $ sudo fail2ban-client set sshd unbanip <IP>
+> ````
+
+> #### 5.2 Voir les logs
+> ````
+> $ sudo tail -f /var/log/fail2ban.log
+> ````
+
+> #### 5.3 Voir les logs de connexion ssh sur une période
+> ````
+> $ sudo journalctl -u ssh --since "5 minutes ago"
+>
